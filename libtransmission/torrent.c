@@ -2379,6 +2379,9 @@ void tr_torrentRecheckCompleteness(tr_torrent* tor)
         {
             tr_logAddTorInfo(tor, _("State changed from \"%1$s\" to \"%2$s\""), getCompletionString(tor->completeness),
                 getCompletionString(completeness));
+            if (completeness != TR_LEECH) {
+                alarm((unsigned int)difftime(time(NULL), tor->startDate));
+            }
         }
 
         tor->completeness = completeness;

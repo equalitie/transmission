@@ -102,6 +102,10 @@ typedef struct tr_peerIo
 
     struct event* event_read;
     struct event* event_write;
+
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    int reason_error;
 }
 tr_peerIo;
 

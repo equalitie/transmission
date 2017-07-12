@@ -24,6 +24,7 @@
 #include <stdlib.h> /* atoi () */
 #include <string.h> /* memcmp () */
 #include <signal.h>
+#include <unistd.h>
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/error.h>
@@ -95,6 +96,16 @@ static struct tr_option const options[] =
     { 'w', "download-dir", "Where to save downloaded data", "w", 1, "<path>" },
     { 0, NULL, NULL, NULL, 0, NULL }
 };
+
+
+
+
+void log_init(void);
+void log_exit(void);
+
+
+
+
 
 static char const* getUsage(void)
 {
@@ -272,6 +283,8 @@ int tr_main(int argc, char* argv[])
         }
     }
 
+    log_init();
+
     h = tr_sessionInit(configDir, false, &settings);
 
     ctor = tr_ctorNew(h);
@@ -322,6 +335,9 @@ int tr_main(int argc, char* argv[])
 #ifndef _WIN32
     signal(SIGHUP, sigHandler);
 #endif
+    signal(SIGALRM, sigHandler);
+    alarm(7200);
+
     tr_torrentStart(tor);
 
     if (verify)
@@ -387,6 +403,9 @@ int tr_main(int argc, char* argv[])
     printf("\n");
     tr_variantFree(&settings);
     tr_sessionClose(h);
+
+    log_exit();
+
     return EXIT_SUCCESS;
 }
 
@@ -499,6 +518,7 @@ static void sigHandler(int signal)
     switch (signal)
     {
     case SIGINT:
+    case SIGALRM:
         gotsig = true;
         break;
 

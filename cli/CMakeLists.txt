@@ -7,7 +7,7 @@ tr_win32_app_info(${PROJECT_NAME}_WIN32_RC_FILE
     "${TR_NAME}-cli"
     "${TR_NAME}-cli.exe")
 
-add_executable(${TR_NAME}-cli cli.c ${${PROJECT_NAME}_WIN32_RC_FILE})
+add_executable(${TR_NAME}-cli cli.c log.c ${${PROJECT_NAME}_WIN32_RC_FILE})
 include_directories(${TR_NAME}-cli ${CURL_INCLUDE_DIRS})
 target_link_libraries(${TR_NAME}-cli ${TR_NAME})
 

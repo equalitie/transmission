@@ -79,6 +79,15 @@ static size_t guessPacketOverhead(size_t d)
     } \
     while (0)
 
+
+
+
+void log_connection_start(tr_address peer_address, int port, int is_ledbat, int is_incoming);
+void log_connection_end(tr_address peer_address, int port, uint64_t bytes_sent, uint64_t bytes_received, int is_encrypted, int is_error);
+
+
+
+
 /**
 ***
 **/
@@ -164,10 +173,12 @@ static void didWriteWrapper(tr_peerIo* io, unsigned int bytes_transferred)
         uint64_t const now = tr_time_msec();
 
         tr_bandwidthUsed(&io->bandwidth, TR_UP, payload, next->isPieceData, now);
+        io->bytes_sent += payload;
 
         if (overhead > 0)
         {
             tr_bandwidthUsed(&io->bandwidth, TR_UP, overhead, false, now);
+            io->bytes_sent += overhead;
         }
 
         if (io->didWrite != NULL)
@@ -220,17 +231,20 @@ static void canReadWrapper(tr_peerIo* io)
                 if (piece != 0)
                 {
                     tr_bandwidthUsed(&io->bandwidth, TR_DOWN, piece, true, now);
+                    io->bytes_received += piece;
                 }
 
                 if (used != piece)
                 {
                     tr_bandwidthUsed(&io->bandwidth, TR_DOWN, used - piece, false, now);
+                    io->bytes_received += (used - piece);
                 }
             }
 
             if (overhead > 0)
             {
                 tr_bandwidthUsed(&io->bandwidth, TR_UP, overhead, false, now);
+                io->bytes_sent += overhead;
             }
 
             switch (ret)
@@ -326,6 +340,7 @@ static void event_read_cb(evutil_socket_t fd, short event UNUSED, void* vio)
         dbgmsg(io, "event_read_cb got an error. res is %d, what is %hd, errno is %d (%s)", res, what, e,
             tr_net_strerror(errstr, sizeof(errstr), e));
 
+        io->reason_error = (what & BEV_EVENT_ERROR) != 0;
         if (io->gotError != NULL)
         {
             io->gotError(io, what, io->userData);
@@ -420,6 +435,7 @@ error:
     tr_net_strerror(errstr, sizeof(errstr), e);
     dbgmsg(io, "event_write_cb got an error. res is %d, what is %hd, errno is %d (%s)", res, what, e, errstr);
 
+    io->reason_error = (what & BEV_EVENT_ERROR) != 0;
     if (io->gotError != NULL)
     {
         io->gotError(io, what, io->userData);
@@ -523,6 +539,7 @@ static void utp_on_state_change(void* closure, int state)
     }
     else if (state == UTP_STATE_EOF)
     {
+        io->reason_error = 0;
         if (io->gotError != NULL)
         {
             io->gotError(io, BEV_EVENT_EOF, io->userData);
@@ -546,6 +563,7 @@ static void utp_on_error(void* closure, int errcode)
 
     dbgmsg(io, "utp_on_error -- errcode is %d", errcode);
 
+    io->reason_error = 1;
     if (io->gotError != NULL)
     {
         errno = errcode;
@@ -682,6 +700,9 @@ static tr_peerIo* tr_peerIoNew(tr_session* session, tr_bandwidth* parent, tr_add
     }
 
 #endif
+
+log_connection_start(io->addr, io->port, (io->utp_socket != NULL), (isIncoming ? 1 : 0));
+
 
     return io;
 }
@@ -862,9 +883,15 @@ static void io_dtor(void* vio)
 {
     tr_peerIo* io = vio;
 
+    log_connection_end(io->addr, io->port, io->bytes_sent, io->bytes_received, io->isEncrypted ? 1 : 0, io->reason_error);
+
     assert(tr_isPeerIo(io));
     assert(tr_amInEventThread(io->session));
     assert(io->session->events != NULL);
+
+
+
+
 
     dbgmsg(io, "in tr_peerIo destructor");
     event_disable(io, EV_READ | EV_WRITE);
@@ -957,6 +984,9 @@ void tr_peerIoClear(tr_peerIo* io)
 
 int tr_peerIoReconnect(tr_peerIo* io)
 {
+log_connection_end(io->addr, io->port, io->bytes_sent, io->bytes_received, io->isEncrypted ? 1 : 0, io->reason_error);
+    
+    
     short int pendingEvents;
     tr_session* session;
 
@@ -974,8 +1004,14 @@ int tr_peerIoReconnect(tr_peerIo* io)
     io->event_read = event_new(session->event_base, io->socket, EV_READ, event_read_cb, io);
     io->event_write = event_new(session->event_base, io->socket, EV_WRITE, event_write_cb, io);
 
+    io->bytes_sent = 0;
+    io->bytes_received = 0;
+    
+    
     if (io->socket != TR_BAD_SOCKET)
     {
+log_connection_start(io->addr, io->port, 0, 0);
+        
         event_enable(io, pendingEvents);
         tr_netSetTOS(io->socket, session->peerSocketTOS);
         maybeSetCongestionAlgorithm(io->socket, session->peer_congestion_algorithm);
@@ -1286,6 +1322,10 @@ static int tr_peerIoTryRead(tr_peerIo* io, size_t howmuch)
                 canReadWrapper(io);
             }
 
+            if (res <= 0 && e != EAGAIN && e != EINTR && e != EINPROGRESS)
+            {
+                io->reason_error = (res != 0);
+            }
             if (res <= 0 && io->gotError != NULL && e != EAGAIN && e != EINTR && e != EINPROGRESS)
             {
                 short what = BEV_EVENT_READING | BEV_EVENT_ERROR;
@@ -1337,6 +1377,10 @@ static int tr_peerIoTryWrite(tr_peerIo* io, size_t howmuch)
                 didWriteWrapper(io, n);
             }
 
+            if (n < 0 && e != 0 && e != EPIPE && e != EAGAIN && e != EINTR && e != EINPROGRESS)
+            {
+                io->reason_error = 1;
+            }
             if (n < 0 && io->gotError != NULL && e != 0 && e != EPIPE && e != EAGAIN && e != EINTR && e != EINPROGRESS)
             {
                 char errstr[512];
