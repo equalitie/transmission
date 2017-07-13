@@ -160,7 +160,7 @@ void log_dht_set_my_id(const unsigned char *myid)
 	sprintf(entry,
 		"{"
 			"\"type\": \"dht-own-id\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"my-id\": \"%s\""
 		"}"
 		, time.tv_sec, time.tv_usec, myid_buffer);
@@ -184,7 +184,7 @@ void log_dht_routing_displace(const unsigned char *id, const struct sockaddr *sa
 	sprintf(entry,
 		"{"
 			"\"type\": \"dht-displace-node\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"peer-id\": \"%s\","
 			"\"peer-address\": \"%s\","
 			"\"peer-port\": %d"
@@ -209,7 +209,7 @@ void log_dht_routing_add(const unsigned char *id, const struct sockaddr *sa, int
 	sprintf(entry,
 		"{"
 			"\"type\": \"dht-add-node\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"peer-id\": \"%s\","
 			"\"peer-address\": \"%s\","
 			"\"peer-port\": %d"
@@ -234,7 +234,7 @@ void log_dht_rpc_request(const unsigned char *id, const struct sockaddr *sa, int
 	sprintf(entry,
 		"{"
 			"\"type\": \"dht-rpc-request\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"peer-id\": \"%s\","
 			"\"peer-address\": \"%s\","
 			"\"peer-port\": %d,"
@@ -260,7 +260,7 @@ void log_dht_rpc_reply(const unsigned char *id, const struct sockaddr *sa, int s
 	sprintf(entry,
 		"{"
 			"\"type\": \"dht-rpc-reply\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"peer-id\": \"%s\","
 			"\"peer-address\": \"%s\","
 			"\"peer-port\": %d,"
@@ -282,7 +282,7 @@ void log_connection_start(tr_address peer_address, int port, int is_ledbat, int 
 	sprintf(entry,
 		"{"
 			"\"type\": \"connection-start\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"peer-address\": \"%s\","
 			"\"peer-port\": %d,"
 			"\"ledbat\": %s,"
@@ -304,7 +304,7 @@ void log_connection_end(tr_address peer_address, int port, uint64_t bytes_sent, 
 	sprintf(entry,
 		"{"
 			"\"type\": \"connection-end\","
-			"\"timestamp\": \"%ld.%06ld\","
+			"\"timestamp\": %ld.%06ld,"
 			"\"peer-address\": \"%s\","
 			"\"peer-port\": %d,"
 			"\"bytes-sent\": %ld,"
