@@ -612,6 +612,9 @@ tr_session* tr_sessionInit(char const* configDir, bool messageQueuingEnabled, tr
     session->cache = tr_cacheNew(1024 * 1024 * 2);
     session->magicNumber = SESSION_MAGIC_NUMBER;
     session->session_id = tr_session_id_new();
+
+    session->accept_filter = NULL;
+
     tr_bandwidthConstruct(&session->bandwidth, session, NULL);
     tr_variantInitList(&session->removedTorrents, 0);
 
@@ -640,6 +643,24 @@ tr_session* tr_sessionInit(char const* configDir, bool messageQueuingEnabled, tr
     }
 
     return session;
+}
+
+void tr_sessionOnAccept(tr_session* session, handshakeFilter filter, void* userdata, filterCallback cb)
+{
+    struct tr_accept_filter* f;
+
+    if (session->accept_filter) {
+        f = session->accept_filter;
+    }
+    else {
+        f = tr_new0(struct tr_accept_filter, 1);
+    }
+
+    f->filter = filter;
+    f->callback = cb;
+    f->userdata = userdata;
+
+    session->accept_filter = f;
 }
 
 static void turtleCheckClock(tr_session* s, struct tr_turtle_info* t);
@@ -2102,7 +2123,9 @@ void tr_sessionClose(tr_session* session)
     tr_free(session->incompleteDir);
     tr_free(session->blocklist_url);
     tr_free(session->peer_congestion_algorithm);
+    tr_free(session->accept_filter);
     tr_free(session);
+
 }
 
 struct sessionLoadTorrentsData

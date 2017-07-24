@@ -2005,7 +2005,7 @@ static void createBitTorrentPeer(tr_torrent* tor, struct tr_peerIo* io, struct p
 
 /* FIXME: this is kind of a mess. */
 static bool myHandshakeDoneCB(tr_handshake* handshake, tr_peerIo* io, bool readAnythingFromPeer, bool isConnected,
-    uint8_t const* peer_id, void* vmanager)
+    uint8_t const* peer_id, void* vmanager, handshakeFilter filter)
 {
     TR_ASSERT(io != NULL);
 
@@ -2032,7 +2032,22 @@ static bool myHandshakeDoneCB(tr_handshake* handshake, tr_peerIo* io, bool readA
 
     addr = tr_peerIoGetAddress(io, &port);
 
-    if (!ok || s == NULL || !s->isRunning)
+    if (ok && filter && manager->session) {
+        tr_session* session = manager->session;
+
+        if (tr_isSession(session) && session->accept_filter && session->accept_filter->filter == filter) {
+            TR_ASSERT(s == NULL);
+            tr_peerIo* io;
+
+            io = tr_handshakeStealIO(handshake); /* this steals its refcount too, which is balanced by tr_peerIoUnref below */
+
+            /* It is expected that the callback increments the refcount if it wants to use it. */
+            session->accept_filter->callback(io, session->accept_filter->userdata);
+
+            tr_peerIoUnref(io);
+        }
+    }
+    else if (!ok || s == NULL || !s->isRunning)
     {
         if (s != NULL)
         {
@@ -2172,6 +2187,10 @@ void tr_peerMgrAddIncoming(tr_peerMgr* manager, tr_address* addr, tr_port port, 
         io = tr_peerIoNewIncoming(session, &session->bandwidth, addr, port, socket);
 
         handshake = tr_handshakeNew(io, session->encryptionMode, myHandshakeDoneCB, manager);
+
+        if (session->accept_filter) {
+            tr_handshakeAddFilter(handshake, session->accept_filter->filter);
+        }
 
         tr_peerIoUnref(io); /* balanced by the implicit ref in tr_peerIoNewIncoming() */
 

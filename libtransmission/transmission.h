@@ -31,6 +31,7 @@ extern "C"
 #include <time.h> /* time_t */
 
 #include "tr-macros.h"
+#include "accept-filter.h"
 
 typedef uint32_t tr_file_index_t;
 typedef uint32_t tr_piece_index_t;
@@ -203,6 +204,9 @@ void tr_sessionSaveSettings(tr_session* session, char const* configDir, struct t
  * @see tr_getDefaultConfigDir()
  */
 tr_session* tr_sessionInit(char const* configDir, bool messageQueueingEnabled, struct tr_variant* settings);
+
+
+void tr_sessionOnAccept(tr_session* session, handshakeFilter filter, void* userdata, filterCallback cb);
 
 /** @brief Update a session's settings from a benc dictionary
            like to the one used in tr_sessionInit() */

@@ -131,6 +131,8 @@ struct tr_handshake
     handshakeDoneCB doneCB;
     void* doneUserData;
     struct event* timeout_timer;
+    // XXX: This should be a collection.
+    handshakeFilter filter;
 };
 
 /**
@@ -222,6 +224,7 @@ static bool buildHandshakeMessage(tr_handshake* handshake, uint8_t* buf)
 }
 
 static ReadState tr_handshakeDone(tr_handshake* handshake, bool isConnected);
+static ReadState tr_handshakeDoneWithFilter(tr_handshake* handshake, bool isConnected, handshakeFilter);
 
 typedef enum
 {
@@ -592,6 +595,7 @@ static ReadState readPadD(tr_handshake* handshake, struct evbuffer* inbuf)
 ****
 ***/
 
+
 static ReadState readHandshake(tr_handshake* handshake, struct evbuffer* inbuf)
 {
     uint8_t pstrlen;
@@ -599,9 +603,11 @@ static ReadState readHandshake(tr_handshake* handshake, struct evbuffer* inbuf)
     uint8_t reserved[HANDSHAKE_FLAGS_LEN];
     uint8_t hash[SHA_DIGEST_LENGTH];
 
-    dbgmsg(handshake, "payload: need %d, got %zu", INCOMING_HANDSHAKE_LEN, evbuffer_get_length(inbuf));
+    size_t length = evbuffer_get_length(inbuf);
 
-    if (evbuffer_get_length(inbuf) < INCOMING_HANDSHAKE_LEN)
+    dbgmsg(handshake, "payload: need %d, got %zu", INCOMING_HANDSHAKE_LEN, length);
+
+    if (length < INCOMING_HANDSHAKE_LEN)
     {
         return READ_LATER;
     }
@@ -622,6 +628,20 @@ static ReadState readHandshake(tr_handshake* handshake, struct evbuffer* inbuf)
     }
     else /* encrypted or corrupt */
     {
+        if (handshake->filter) {
+            const unsigned char* buf = evbuffer_pullup(inbuf, length);
+            switch (handshake->filter(buf, length))
+            {
+                case FILTER_PASS:
+                    tr_handshakeDoneWithFilter(handshake, true, handshake->filter);
+                    return READ_LATER;
+                case FILTER_LATER:
+                    return READ_LATER;
+                case FILTER_FAIL:
+                    break;
+            }
+        }
+
         tr_peerIoSetEncryption(handshake->io, PEER_ENCRYPTION_RC4);
 
         if (tr_peerIoIsIncoming(handshake->io))
@@ -1103,11 +1123,11 @@ static ReadState canRead(struct tr_peerIo* io, void* arg, size_t* piece)
     return ret;
 }
 
-static bool fireDoneFunc(tr_handshake* handshake, bool isConnected)
+static bool fireDoneFunc(tr_handshake* handshake, bool isConnected, handshakeFilter filter)
 {
     uint8_t const* peer_id = (isConnected && handshake->havePeerID) ? tr_peerIoGetPeersId(handshake->io) : NULL;
     bool const success = (*handshake->doneCB)(handshake, handshake->io, handshake->haveReadAnythingFromPeer, isConnected,
-        peer_id, handshake->doneUserData);
+        peer_id, handshake->doneUserData, filter);
 
     return success;
 }
@@ -1123,18 +1143,22 @@ static void tr_handshakeFree(tr_handshake* handshake)
     tr_free(handshake);
 }
 
-static ReadState tr_handshakeDone(tr_handshake* handshake, bool isOK)
+static ReadState tr_handshakeDoneWithFilter(tr_handshake* handshake, bool isOK, handshakeFilter filter)
 {
     bool success;
 
-    dbgmsg(handshake, "handshakeDone: %s", isOK ? "connected" : "aborting");
     tr_peerIoSetIOFuncs(handshake->io, NULL, NULL, NULL, NULL);
 
-    success = fireDoneFunc(handshake, isOK);
+    success = fireDoneFunc(handshake, isOK, filter);
 
     tr_handshakeFree(handshake);
 
     return success ? READ_LATER : READ_ERR;
+}
+
+static ReadState tr_handshakeDone(tr_handshake* handshake, bool isOK)
+{
+    return tr_handshakeDoneWithFilter(handshake, isOK, NULL);
 }
 
 void tr_handshakeAbort(tr_handshake* handshake)
@@ -1224,6 +1248,7 @@ tr_handshake* tr_handshakeNew(tr_peerIo* io, tr_encryption_mode encryptionMode, 
     handshake->doneUserData = doneUserData;
     handshake->session = session;
     handshake->timeout_timer = evtimer_new(session->event_base, handshakeTimeout, handshake);
+    handshake->filter = NULL;
     tr_timerAdd(handshake->timeout_timer, HANDSHAKE_TIMEOUT_SEC, 0);
 
     tr_peerIoRef(io); /* balanced by the unref in tr_handshakeFree */
@@ -1275,4 +1300,9 @@ tr_address const* tr_handshakeGetAddr(struct tr_handshake const* handshake, tr_p
     TR_ASSERT(handshake->io != NULL);
 
     return tr_peerIoGetAddress(handshake->io, port);
+}
+
+void tr_handshakeAddFilter(struct tr_handshake* handshake, handshakeFilter filter)
+{
+    handshake->filter = filter;
 }
