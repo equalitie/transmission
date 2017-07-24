@@ -361,7 +361,7 @@ ipv6:
         }
     }
 
-    tr_udpSetSocketBuffers(ss);
+    //tr_udpSetSocketBuffers(ss);
 
     if (ss->isDHTEnabled)
     {
