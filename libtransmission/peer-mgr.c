@@ -2018,7 +2018,7 @@ static bool myHandshakeDoneCB(tr_handshake* handshake, tr_peerIo* io, bool readA
 
     if (tr_peerIoIsIncoming(io))
     {
-        tr_ptrArrayRemoveSortedPointer(&manager->incomingHandshakes, handshake, handshakeCompare);
+        tr_ptrArrayRemoveSortedPointerNoCheck(&manager->incomingHandshakes, handshake, handshakeCompare);
     }
     else if (s != NULL)
     {
@@ -2194,7 +2194,9 @@ void tr_peerMgrAddIncoming(tr_peerMgr* manager, tr_address* addr, tr_port port, 
 
         tr_peerIoUnref(io); /* balanced by the implicit ref in tr_peerIoNewIncoming() */
 
-        tr_ptrArrayInsertSorted(&manager->incomingHandshakes, handshake, handshakeCompare);
+        if (!session->accept_filter) {
+            tr_ptrArrayInsertSorted(&manager->incomingHandshakes, handshake, handshakeCompare);
+        }
     }
 
     managerUnlock(manager);

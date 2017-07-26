@@ -232,6 +232,11 @@ static void* tr_ptrArrayRemoveSortedValue(tr_ptrArray* t, void const* ptr, int (
     return ret;
 }
 
+void tr_ptrArrayRemoveSortedPointerNoCheck(tr_ptrArray* t, void const* ptr, int (* compare)(void const*, void const*))
+{
+    return tr_ptrArrayRemoveSortedValue(t, ptr, compare);
+}
+
 void tr_ptrArrayRemoveSortedPointer(tr_ptrArray* t, void const* ptr, int (* compare)(void const*, void const*))
 {
     void* removed = tr_ptrArrayRemoveSortedValue(t, ptr, compare);

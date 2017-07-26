@@ -120,6 +120,9 @@ int tr_ptrArrayLowerBound(tr_ptrArray const* array, void const* key, int (* comp
     @return the index of the stored pointer */
 int tr_ptrArrayInsertSorted(tr_ptrArray* array, void* value, int (* compare)(void const*, void const*));
 
+/** @brief Remove this specific pointer from a sorted ptrarray if it's there */
+void tr_ptrArrayRemoveSortedPointerNoCheck(tr_ptrArray* t, void const* ptr, int (* compare)(void const*, void const*));
+
 /** @brief Remove this specific pointer from a sorted ptrarray */
 void tr_ptrArrayRemoveSortedPointer(tr_ptrArray* t, void const* ptr, int (* compare)(void const*, void const*));
 
