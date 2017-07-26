@@ -93,6 +93,7 @@ macro(tr_add_external_auto_library ID DIRNAME LIBNAME)
             URL "${CMAKE_SOURCE_DIR}/third-party/${DIRNAME}"
             ${ARGN}
             PREFIX "${${ID}_PREFIX}"
+            BUILD_ALWAYS 1
             CMAKE_ARGS
                 -Wno-dev # We don't want to be warned over unused variables
                 "-DCMAKE_TOOLCHAIN_FILE:PATH=${CMAKE_TOOLCHAIN_FILE}"
